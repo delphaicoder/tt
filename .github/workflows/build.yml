@@ -1,0 +1,68 @@
+name: Build AppOpenAnimation
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git perl fakeroot build-essential rsync curl xz-utils
+          sudo apt-get install -y libtinfo5 libncurses5 || true
+
+      - name: Ensure libtinfo.so.5 exists (fallback symlink)
+        run: |
+          if [ ! -e /usr/lib/x86_64-linux-gnu/libtinfo.so.5 ]; then
+            LIBTINFO6=$(find / -name "libtinfo.so.6*" 2>/dev/null | head -n1)
+            [ -n "$LIBTINFO6" ] && sudo ln -s "$LIBTINFO6" /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          fi
+          if [ ! -e /usr/lib/x86_64-linux-gnu/libncurses.so.5 ]; then
+            LIBNCURSES6=$(find / -name "libncurses.so.6*" 2>/dev/null | head -n1)
+            [ -n "$LIBNCURSES6" ] && sudo ln -s "$LIBNCURSES6" /usr/lib/x86_64-linux-gnu/libncurses.so.5
+          fi
+
+      - name: Set THEOS env
+        run: echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Clone Theos
+        run: git clone --recursive https://github.com/theos/theos.git "$THEOS"
+
+      - name: Install iOS toolchain (Linux x86_64)
+        run: |
+          curl -LO https://github.com/sbingner/llvm-project/releases/latest/download/linux-ios-arm64e-clang-toolchain.tar.lzma
+          TMP=$(mktemp -d)
+          tar -xvf linux-ios-arm64e-clang-toolchain.tar.lzma -C "$TMP"
+          mkdir -p "$THEOS/toolchain/linux/iphone"
+          mv "$TMP"/ios-arm64e-clang-toolchain/* "$THEOS/toolchain/linux/iphone/"
+          rm -rf linux-ios-arm64e-clang-toolchain.tar.lzma "$TMP"
+
+      - name: Install iOS SDK (14.5)
+        run: |
+          TMP=$(mktemp -d)
+          git clone -n --depth=1 --filter=tree:0 https://github.com/theos/sdks.git "$TMP/sdks"
+          cd "$TMP/sdks"
+          git sparse-checkout set --no-cone iPhoneOS14.5.sdk
+          git checkout
+          mkdir -p "$THEOS/sdks"
+          mv iPhoneOS14.5.sdk "$THEOS/sdks/"
+          rm -rf "$THEOS/sdks/iPhoneOS14.5.sdk/usr/include/c++"
+
+      - name: Build package
+        run: |
+          export THEOS="$HOME/theos"
+          export PATH="$THEOS/bin:$PATH"
+          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AppOpenAnimation-deb
+          path: packages/*.deb

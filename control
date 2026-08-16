@@ -1,0 +1,11 @@
+Package: com.yourname.appopenanimation
+Name: AppOpenAnimation
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: Mo phong hieu ung mo/dong app kieu iOS 26 concept, tune theo du lieu do that tu video (khong bounce, damping cao, ~250ms). Overlay rieng, khong thay the pipeline mo app that cua he thong nen an toan.
+Maintainer: YourName <you@example.com>
+Author: YourName <you@example.com>
+Section: Tweaks
+Depends: firmware (>= 15.0), mobilesubstrate
+Homepage: https://example.com
+Tag: purpose::customization
